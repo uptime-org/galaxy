@@ -1,5 +1,11 @@
 name: Build and Deploy
 
+# Grant write permissions for packages and contents
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
 on:
   push:
     branches: ["**"]  # Build on all branches
