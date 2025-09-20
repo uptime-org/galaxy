@@ -8,4 +8,7 @@ exclude =
     .venv,
     venv,
     build,
-    dist
+    dist,
+    docs,
+    ci-test,
+    helm

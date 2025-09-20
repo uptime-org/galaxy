@@ -21,7 +21,7 @@ RUN curl https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud
 # Create app directory and copy requirements
 WORKDIR /app
 COPY ci-test/requirements.txt /app/ci-requirements.txt
-COPY requirements.txt /app/app-requirements.txt
+COPY src/requirements.txt /app/app-requirements.txt
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r ci-requirements.txt -r app-requirements.txt

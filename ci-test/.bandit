@@ -1,3 +1,7 @@
-[bandit]
-exclude_dirs = ci-test,helm,.git
-skips = B101
+exclude_dirs:
+  - ci-test
+  - helm
+  - docs
+  - .git
+skips:
+  - B101

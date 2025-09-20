@@ -59,22 +59,22 @@ echo ""
 run_flake8() {
     if [[ "$LINT_TYPES" == "all" || "$LINT_TYPES" == *"flake8"* ]]; then
         echo "🔍 Running flake8 linting..."
-        flake8 --config=.flake8 . --format=json --output-file="$OUTPUT_DIR/flake8-report.json" || true
-        flake8 --config=.flake8 . || echo "❌ Flake8 found issues"
+        flake8 --config=.flake8 src/ --format=json --output-file="$OUTPUT_DIR/flake8-report.json" || true
+        flake8 --config=.flake8 src/ || echo "❌ Flake8 found issues"
     fi
 }
 
 run_black() {
     if [[ "$LINT_TYPES" == "all" || "$LINT_TYPES" == *"black"* ]]; then
         echo "🎨 Running black formatting check..."
-        black --check --diff . > "$OUTPUT_DIR/black-report.txt" 2>&1 || echo "❌ Black found formatting issues"
+        black --check --diff src/ > "$OUTPUT_DIR/black-report.txt" 2>&1 || echo "❌ Black found formatting issues"
     fi
 }
 
 run_isort() {
     if [[ "$LINT_TYPES" == "all" || "$LINT_TYPES" == *"isort"* ]]; then
         echo "📦 Running isort import sorting check..."
-        isort --check-only --diff . > "$OUTPUT_DIR/isort-report.txt" 2>&1 || echo "❌ Isort found import issues"
+        isort --check-only --diff src/ > "$OUTPUT_DIR/isort-report.txt" 2>&1 || echo "❌ Isort found import issues"
     fi
 }
 
@@ -82,7 +82,7 @@ run_isort() {
 run_bandit() {
     if [[ "$TESTS" == "all" || "$TESTS" == *"security"* ]]; then
         echo "🔒 Running bandit security scan..."
-        bandit -c .bandit -r . -f json -o "$OUTPUT_DIR/bandit-report.json" || true
+        bandit -c .bandit -r src/ -f json -o "$OUTPUT_DIR/bandit-report.json" || true
         echo "📄 Security report saved to: $OUTPUT_DIR/bandit-report.json"
     fi
 }
@@ -90,7 +90,7 @@ run_bandit() {
 run_safety() {
     if [[ "$TESTS" == "all" || "$TESTS" == *"safety"* ]]; then
         echo "🛡️ Running safety dependency check..."
-        safety check --json --output "$OUTPUT_DIR/safety-report.json" || true
+        safety check --json > "$OUTPUT_DIR/safety-report.json" || true
         echo "📄 Safety report saved to: $OUTPUT_DIR/safety-report.json"
     fi
 }
@@ -102,7 +102,9 @@ run_pytest() {
         if [ -d "tests" ]; then
             pytest tests/ --json-report --json-report-file="$OUTPUT_DIR/pytest-report.json" || true
         else
-            echo "📝 No tests directory found, skipping pytest"
+            echo "📝 No tests directory on run test"
+            # Create an empty pytest report for consistency
+            echo '{"tests":[],"summary":{"total":0,"passed":0,"failed":0,"error":0,"skipped":0}}' > "$OUTPUT_DIR/pytest-report.json"
         fi
     fi
 }

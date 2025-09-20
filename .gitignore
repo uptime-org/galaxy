@@ -3,6 +3,10 @@
 .swiggit.json
 .env
 .env copy
+
+# CI test reports
+ci-test/reports/
+!ci-test/reports/.gitkeep
 # Environment variables and secrets
 *.env
 .env.local

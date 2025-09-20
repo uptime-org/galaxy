@@ -1,7 +1,21 @@
+# Core linting and formatting
 flake8==6.0.0
-bandit==1.7.5
-safety==3.0.1
+black==22.12.0
+isort==5.12.0
+
+# Security and safety
+bandit[toml]==1.7.5
+pbr>=2.0.0
+safety==2.3.5
+typer>=0.7.0,<0.10.0
+click>=8.0.0
+
+# Testing
 pytest==7.4.2
 pytest-json-report==1.5.0
-black==23.9.1
-isort==5.12.0
+
+# Additional dependencies for bandit and safety
+PyYAML>=5.4.0
+colorama>=0.4.4
+requests>=2.25.0
+packaging>=21.0,<22.0
