@@ -79,6 +79,9 @@ show_help() {
     echo "  actions status        Show current pipeline status"
     echo "  actions logs [run_id] Show workflow logs"
     echo "  actions summary       Show pipeline health summary"
+    echo "  actions failures      Show recent failure details"
+    echo "  actions debug         Debug latest failed run"
+    echo "  actions fix           Suggest fixes for common issues"
     echo "  actions --watch       Watch workflow runs in real-time"
     echo ""
     echo -e "${YELLOW}Examples:${NC}"
@@ -343,13 +346,13 @@ case "${1}" in
             status)
                 echo -e "${PURPLE}🔄 Pipeline Status${NC}"
                 echo "=================="
-                gh run list --limit 1 --json status,conclusion,displayTitle,createdAt,htmlUrl --template '
+                gh run list --limit 1 --json status,conclusion,displayTitle,createdAt,url --template '
                 {{- range . -}}
                 🔍 Status: {{.status}}
                 🎯 Result: {{.conclusion}}
                 📝 Title: {{.displayTitle}}
                 🕒 Started: {{.createdAt}}
-                🔗 URL: {{.htmlUrl}}
+                🔗 URL: {{.url}}
                 {{- end -}}'
                 ;;
             logs)
@@ -365,10 +368,83 @@ case "${1}" in
                 echo "============================"
                 echo -e "${BLUE}Last 10 runs:${NC}"
                 gh run list --limit 10 --json status,conclusion --jq '
-                "\(✅ Success: \(map(select(.conclusion == "success")) | length))" ,
-                "\(❌ Failed: \(map(select(.conclusion == "failure")) | length))" ,
-                "\(🟡 Pending: \(map(select(.status == "in_progress" or .status == "queued")) | length))"
+                "Success: \(map(select(.conclusion == "success")) | length)" ,
+                "Failed: \(map(select(.conclusion == "failure")) | length)" ,
+                "Pending: \(map(select(.status == "in_progress" or .status == "queued")) | length)"
                 '
+                echo -e "${GREEN}✅ Success runs shown above${NC}"
+                echo -e "${RED}❌ Failed runs shown above${NC}"
+                echo -e "${YELLOW}🟡 Pending runs shown above${NC}"
+                ;;
+            failures)
+                echo -e "${RED}🐛 Recent Failures Analysis${NC}"
+                echo "=============================="
+                echo -e "${BLUE}Failed runs with details:${NC}"
+                gh run list --limit 5 --json status,conclusion,displayTitle,createdAt,url,databaseId --jq '
+                .[] | select(.conclusion == "failure") | 
+                "ID: \(.databaseId)\nTitle: \(.displayTitle)\nTime: \(.createdAt)\nURL: \(.url)\n---"
+                '
+                echo -e "${YELLOW}💡 Use './op actions debug' for detailed failure analysis${NC}"
+                ;;
+            debug)
+                echo -e "${RED}🔍 Debugging Latest Build${NC}"
+                echo "======================="
+                LATEST_RUN_ID=$(gh run list --limit 1 --json databaseId --jq '.[0].databaseId')
+                if [[ -n "$LATEST_RUN_ID" ]]; then
+                    echo -e "${BLUE}Analyzing latest run $LATEST_RUN_ID...${NC}"
+                    echo ""
+                    echo -e "${YELLOW}Run details:${NC}"
+                    gh run view "$LATEST_RUN_ID" --json status,conclusion,displayTitle,createdAt --jq '
+                    "🔍 Status: \(.status)\n🎯 Result: \(.conclusion)\n📝 Title: \(.displayTitle)\n🕒 Started: \(.createdAt)"
+                    '
+                    echo ""
+                    echo -e "${YELLOW}Jobs and their status:${NC}"
+                    gh run view "$LATEST_RUN_ID" --json jobs --jq '.jobs[] | "Job: \(.name) - Status: \(.conclusion)"'
+                    echo ""
+                    # Show logs for failed jobs, or all logs if run failed
+                    RUN_STATUS=$(gh run view "$LATEST_RUN_ID" --json conclusion --jq '.conclusion')
+                    if [[ "$RUN_STATUS" == "failure" ]]; then
+                        echo -e "${YELLOW}Failed job logs:${NC}"
+                        gh run view "$LATEST_RUN_ID" --log-failed
+                    else
+                        echo -e "${GREEN}Run completed successfully!${NC}"
+                        echo -e "${BLUE}Use './op actions logs $LATEST_RUN_ID' for full logs${NC}"
+                    fi
+                else
+                    echo -e "${BLUE}No runs found${NC}"
+                fi
+                ;;
+            fix)
+                echo -e "${GREEN}🔧 Common CI Issue Fixes${NC}"
+                echo "========================="
+                echo -e "${BLUE}Analyzing recent failures...${NC}"
+                RECENT_LOGS=$(gh run list --limit 1 --json conclusion,databaseId --jq '.[] | select(.conclusion == "failure") | .databaseId' | head -1)
+                if [[ -n "$RECENT_LOGS" ]]; then
+                    FAILURE_CONTENT=$(gh run view "$RECENT_LOGS" --log-failed 2>/dev/null | tail -20)
+                    if echo "$FAILURE_CONTENT" | grep -q "denied.*organization package"; then
+                        echo ""
+                        echo -e "${RED}🐛 Issue: GitHub Container Registry Permission Denied${NC}"
+                        echo -e "${YELLOW}The CI is trying to push to ghcr.io but lacks permissions.${NC}"
+                        echo ""
+                        echo -e "${GREEN}🔧 Fixes:${NC}"
+                        echo "1. Update GitHub Actions permissions:"
+                        echo "   • Go to Settings > Actions > General"
+                        echo "   • Set 'Workflow permissions' to 'Read and write permissions'"
+                        echo ""
+                        echo "2. Or update the workflow to not push to registry:"
+                        echo "   • Set push: false in the docker build action"
+                        echo ""
+                        echo "3. Or use personal access token:"
+                        echo "   • Add GHCR_TOKEN secret with package write permissions"
+                        echo ""
+                        echo -e "${PURPLE}📝 Quick fix: Disable push for now${NC}"
+                        echo "Edit .github/workflows/deploy.yml and set 'push: false'"
+                    else
+                        echo -e "${BLUE}No specific fix pattern detected. Check logs with './op actions debug'${NC}"
+                    fi
+                else
+                    echo -e "${BLUE}No recent failures to analyze${NC}"
+                fi
                 ;;
             --watch)
                 echo -e "${PURPLE}👀 Watching ecosystem CI/CD pipelines...${NC}"
@@ -381,7 +457,7 @@ case "${1}" in
                 echo -e "${BLUE}📊 Last 10 runs:${NC}"
                 gh run list --limit 10
                 echo ""
-                echo -e "${YELLOW}💡 Commands: status | logs [run_id] | summary | --watch${NC}"
+                echo -e "${YELLOW}💡 Commands: status | logs [run_id] | summary | failures | debug | fix | --watch${NC}"
                 ;;
         esac
         ;;
