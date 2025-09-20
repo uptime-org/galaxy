@@ -1,0 +1,34 @@
+---
+# Source: galaxy/templates/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: galaxy-prod
+  namespace: prod
+  labels:
+    app.kubernetes.io/name: galaxy
+    app.kubernetes.io/instance: galaxy-prod
+    app.kubernetes.io/environment: prod
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: galaxy-prod.yourdomain.com
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    external-dns.alpha.kubernetes.io/hostname: '{{ .Values.app.name }}-{{ .Values.env
+      }}.{{ .Values.global.domain }}'
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - galaxy-prod.yourdomain.com
+      secretName: galaxy-prod-tls
+  rules:
+    - host: galaxy-prod.yourdomain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: galaxy-prod
+                port:
+                  number: 80

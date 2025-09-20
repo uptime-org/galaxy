@@ -2,9 +2,10 @@ name: Build and Deploy
 
 on:
   push:
-    branches: [main, feature/*]
+    branches: ["**"]  # Build on all branches
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened]
   issue_comment:
     types: [created]
 
@@ -31,10 +32,11 @@ jobs:
           name: ci-reports
           path: ci-test/reports/
 
-  # Build Container
+  # Build Container  
   build:
     runs-on: ubuntu-latest
     needs: test
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     outputs:
       image-tag: ${{ github.sha }}
       domain: ${{ steps.extract.outputs.domain }}
@@ -81,6 +83,7 @@ jobs:
           trigger: ".deploy"
           environment_targets: "dev,stage,prod"
           environment_urls: "dev|https://${{ env.SERVICE }}-dev.${{ needs.build.outputs.domain }},stage|https://${{ env.SERVICE }}-stage.${{ needs.build.outputs.domain }},prod|https://${{ env.SERVICE }}-prod.${{ needs.build.outputs.domain }}"
+          production_environments: "stage,prod"  # Only main branch can deploy to stage/prod
           admins: ${{ vars.DEPLOY_ADMINS }}
           admins_pat: ${{ secrets.GITHUB_TOKEN }}
 

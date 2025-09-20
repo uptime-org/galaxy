@@ -1,0 +1,101 @@
+---
+# Source: galaxy/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: galaxy-prod
+  namespace: prod
+  labels:
+    app.kubernetes.io/name: galaxy
+    app.kubernetes.io/instance: galaxy
+    app.kubernetes.io/version: 1.0.0
+    app.kubernetes.io/environment: prod
+    app.kubernetes.io/team: 
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: galaxy
+      app.kubernetes.io/instance: galaxy
+  template:
+    metadata:
+      annotations:
+      labels:
+        app.kubernetes.io/name: galaxy
+        app.kubernetes.io/instance: galaxy
+        app.kubernetes.io/environment: prod
+        app.kubernetes.io/team: 
+    spec:
+      serviceAccountName: galaxy-prod
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: galaxy
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 1000
+          image: "galaxy/hello-world:test"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5000
+              protocol: TCP
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          env:
+            - name: ENVIRONMENT
+              value: "prod"
+            - name: APP_NAME
+              value: galaxy-prod
+            - name: PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: galaxy-prod-secrets
+                  key: password
+          volumeMounts:
+            - name: secrets
+              mountPath: /app/secrets
+              readOnly: true
+      volumes:
+        - name: secrets
+          secret:
+            secretName: galaxy-prod-secrets
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - galaxy
+              topologyKey: kubernetes.io/hostname
+            weight: 100

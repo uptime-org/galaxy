@@ -1,0 +1,90 @@
+---
+# Source: galaxy/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: galaxy-dev
+  namespace: dev
+  labels:
+    app.kubernetes.io/name: galaxy
+    app.kubernetes.io/instance: galaxy
+    app.kubernetes.io/version: 1.0.0
+    app.kubernetes.io/environment: dev
+    app.kubernetes.io/team: 
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: galaxy
+      app.kubernetes.io/instance: galaxy
+  template:
+    metadata:
+      annotations:
+      labels:
+        app.kubernetes.io/name: galaxy
+        app.kubernetes.io/instance: galaxy
+        app.kubernetes.io/environment: dev
+        app.kubernetes.io/team: 
+    spec:
+      serviceAccountName: galaxy-dev
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: galaxy
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 1000
+          image: "galaxy/hello-world:test"
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 5000
+              protocol: TCP
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+          env:
+            - name: ENVIRONMENT
+              value: "dev"
+            - name: APP_NAME
+              value: galaxy-dev
+            - name: PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: galaxy-dev-secrets
+                  key: password
+          volumeMounts:
+            - name: secrets
+              mountPath: /app/secrets
+              readOnly: true
+      volumes:
+        - name: secrets
+          secret:
+            secretName: galaxy-dev-secrets

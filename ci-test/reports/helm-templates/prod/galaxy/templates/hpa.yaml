@@ -1,0 +1,31 @@
+---
+# Source: galaxy/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: galaxy-prod
+  namespace: prod
+  labels:
+    app.kubernetes.io/name: galaxy
+    app.kubernetes.io/instance: galaxy-prod
+    app.kubernetes.io/environment: prod
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: galaxy-prod
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80

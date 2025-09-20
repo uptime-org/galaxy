@@ -7,8 +7,10 @@ TESTS="all"
 LINT_TYPES="all"
 OUTPUT_DIR="/app/ci-test/reports"
 
-# Create output directory
+# Create output directory and ensure it exists
 mkdir -p "$OUTPUT_DIR"
+# Create a placeholder file to ensure directory exists for CI artifacts
+touch "$OUTPUT_DIR/.gitkeep"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do

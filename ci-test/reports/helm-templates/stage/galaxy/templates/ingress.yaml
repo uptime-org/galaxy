@@ -1,0 +1,34 @@
+---
+# Source: galaxy/templates/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: galaxy-stage
+  namespace: stage
+  labels:
+    app.kubernetes.io/name: galaxy
+    app.kubernetes.io/instance: galaxy-stage
+    app.kubernetes.io/environment: stage
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: galaxy-stage.yourdomain.com
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    external-dns.alpha.kubernetes.io/hostname: '{{ .Values.app.name }}-{{ .Values.env
+      }}.{{ .Values.global.domain }}'
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - galaxy-stage.yourdomain.com
+      secretName: galaxy-stage-tls
+  rules:
+    - host: galaxy-stage.yourdomain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: galaxy-stage
+                port:
+                  number: 80
