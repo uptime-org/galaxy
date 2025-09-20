@@ -1,0 +1,26 @@
+{{- if .Values.gatewayApi.enabled -}}
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: {{ include "service.fullname" . }}
+  namespace: {{ include "service.namespace" . }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.service.name }}
+    app.kubernetes.io/instance: {{ .Values.service.name }}-{{ .Values.env }}
+    app.kubernetes.io/environment: {{ .Values.env }}
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: {{ .Values.service.name }}-{{ .Values.env }}.{{ .Values.global.domain }}
+spec:
+  parentRefs:
+    - name: {{ .Values.gatewayApi.gatewayName }}
+  hostnames:
+    - {{ .Values.service.name }}-{{ .Values.env }}.{{ .Values.global.domain }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ include "service.fullname" . }}
+          port: {{ .Values.service.port }}
+{{- end }}

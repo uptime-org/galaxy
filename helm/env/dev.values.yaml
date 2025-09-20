@@ -1,0 +1,34 @@
+# Development environment values
+env: dev
+
+# Replica configuration for dev
+replicaCount: 1
+
+# Image pull policy for dev (Always to get latest builds)
+image:
+  pullPolicy: Always
+
+# Resource configuration (lower for dev)
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+# Autoscaling disabled in dev
+autoscaling:
+  enabled: false
+
+# Ingress configuration for dev
+ingress:
+  enabled: true
+
+# Istio configuration for dev (alternative to ingress)
+istio:
+  enabled: false
+
+# Pod disruption budget (relaxed for dev)
+podDisruptionBudget:
+  enabled: false

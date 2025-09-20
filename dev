@@ -1,0 +1,59 @@
+#!/bin/bash
+set -e
+
+SERVICE="galaxy"
+IMAGE="$SERVICE:dev"
+NAMESPACE="local"
+
+case "${1}" in
+    test)
+        echo "🧪 Running tests..."
+        ./run-ci.sh "${@:2}"
+        ;;
+    
+    build)
+        if [[ "${2}" == "--clean" ]]; then
+            echo "🏗️  Building $IMAGE (no cache)..."
+            docker build --no-cache -t "$IMAGE" .
+        else
+            echo "🏗️  Building $IMAGE..."
+            docker build -t "$IMAGE" .
+        fi
+        echo "✅ Built $IMAGE"
+        ;;
+    
+    deploy)
+        echo "🚀 Deploying to local k8s..."
+        TEAM=$(grep "^\* @" .github/CODEOWNERS | head -1 | sed 's/^\* @//' | awk '{print $1}' || echo "dev-team")
+        
+        helm upgrade --install "$SERVICE-local" ./helm \
+            --namespace "$NAMESPACE" \
+            --create-namespace \
+            --values ./helm/values.yaml \
+            --values ./helm/env/local.values.yaml \
+            --set env="local" \
+            --set service.name="$SERVICE" \
+            --set image.repository="$SERVICE" \
+            --set image.tag="dev" \
+            --set image.pullPolicy="Never" \
+            --set team="$TEAM" \
+            --wait
+            
+        echo "✅ Deployed! Access: http://galaxy-local.localhost (or add to /etc/hosts)"
+        ;;
+    
+    run)
+        $0 build "${2}"
+        $0 deploy
+        ;;
+    
+    *)
+        echo "Galaxy Dev Script"
+        echo ""
+        echo "Commands:"
+        echo "  test              Run CI tests"
+        echo "  build [--clean]   Build local image (--clean = no cache)"
+        echo "  deploy            Deploy to local k8s"
+        echo "  run [--clean]     Build + Deploy (--clean = no cache)"
+        ;;
+esac

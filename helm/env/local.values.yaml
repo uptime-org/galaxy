@@ -1,0 +1,39 @@
+# Local development environment values
+env: local
+
+# Single replica for local dev
+replicaCount: 1
+
+# Image pull policy for local dev (Never = use local Docker images)
+image:
+  pullPolicy: Never
+
+# Resource configuration (minimal for local)
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+# Autoscaling disabled for local
+autoscaling:
+  enabled: false
+
+# Ingress enabled for local (no port-forward needed)
+ingress:
+  enabled: true
+  className: "nginx"
+
+# Istio disabled for local
+istio:
+  enabled: false
+
+# Pod disruption budget disabled for local
+podDisruptionBudget:
+  enabled: false
+
+# Service type NodePort for local access
+service:
+  type: ClusterIP

@@ -1,0 +1,38 @@
+# Staging environment values
+env: stage
+
+# Replica configuration for stage
+replicaCount: 2
+
+# Image pull policy for stage
+image:
+  pullPolicy: IfNotPresent
+
+# Resource configuration (moderate for stage)
+resources:
+  limits:
+    cpu: 300m
+    memory: 384Mi
+  requests:
+    cpu: 75m
+    memory: 96Mi
+
+# Autoscaling enabled in stage
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+# Ingress configuration for stage
+ingress:
+  enabled: true
+
+# Istio configuration for stage (alternative to ingress)
+istio:
+  enabled: false
+
+# Pod disruption budget (enabled for stage)
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

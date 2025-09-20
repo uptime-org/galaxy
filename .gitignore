@@ -1,0 +1,12 @@
+# Sensitive files and directories
+.ssh/
+.swiggit.json
+.env
+.env copy
+# Environment variables and secrets
+*.env
+.env.local
+.env.production
+.env.staging
+secrets/
+config/secrets/

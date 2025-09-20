@@ -1,0 +1,19 @@
+apiVersion: v2
+name: galaxy
+description: Galaxy Hello World
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - flask
+  - python
+  - web
+  - microservice
+home: https://github.com/uptime-org/galaxy-helloworld
+sources:
+  - https://github.com/uptime-org/galaxy-helloworld
+maintainers:
+  - name: Development Team
+    email: shawn.p.meredith@gmail.com
+annotations:
+  category: WebApplication

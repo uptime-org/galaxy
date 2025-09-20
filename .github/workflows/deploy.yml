@@ -1,0 +1,130 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main, feature/*]
+  pull_request:
+    branches: [main]
+  issue_comment:
+    types: [created]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  SERVICE: galaxy
+
+jobs:
+  # CI Testing
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run CI Tests
+        run: |
+          docker build -f ci-test/Dockerfile -t ci-runner .
+          docker run --rm -v ${{ github.workspace }}/ci-test/reports:/app/ci-test/reports ci-runner
+      - name: Upload Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-reports
+          path: ci-test/reports/
+
+  # Build Container
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    outputs:
+      image-tag: ${{ github.sha }}
+      domain: ${{ steps.extract.outputs.domain }}
+      team: ${{ steps.extract.outputs.team }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Extract values
+        id: extract
+        run: |
+          # Extract domain from Helm values
+          DOMAIN=$(yq '.global.domain' helm/values.yaml)
+          echo "domain=$DOMAIN" >> $GITHUB_OUTPUT
+          
+          # Extract global team from CODEOWNERS (first * line)
+          TEAM=$(grep "^\* @" .github/CODEOWNERS | head -1 | sed 's/^\* @//' | awk '{print $1}')
+          echo "team=$TEAM" >> $GITHUB_OUTPUT
+          
+          echo "Extracted domain: $DOMAIN"
+          echo "Extracted team: $TEAM"
+      - name: Login to Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+  # Branch Deploy with Approval
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'issue_comment' || github.event_name == 'push'
+    steps:
+      - name: Branch Deploy
+        id: deploy
+        uses: github/branch-deploy@v9
+        with:
+          trigger: ".deploy"
+          environment_targets: "dev,stage,prod"
+          environment_urls: "dev|https://${{ env.SERVICE }}-dev.${{ needs.build.outputs.domain }},stage|https://${{ env.SERVICE }}-stage.${{ needs.build.outputs.domain }},prod|https://${{ env.SERVICE }}-prod.${{ needs.build.outputs.domain }}"
+          admins: ${{ vars.DEPLOY_ADMINS }}
+          admins_pat: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout
+        if: steps.deploy.outputs.continue == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.deploy.outputs.ref }}
+
+      - name: Authenticate to GCP
+        if: steps.deploy.outputs.continue == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Deploy to GKE
+        if: steps.deploy.outputs.continue == 'true'
+        run: |
+          gcloud container clusters get-credentials ${{ secrets.GKE_CLUSTER }} --zone ${{ secrets.GKE_ZONE }} --project ${{ secrets.GCP_PROJECT }}
+          helm upgrade --install ${{ env.SERVICE }}-${{ steps.deploy.outputs.environment }} ./helm \
+            --namespace ${{ steps.deploy.outputs.environment }} \
+            --create-namespace \
+            --values ./helm/values.yaml \
+            --values ./helm/env/${{ steps.deploy.outputs.environment }}.values.yaml \
+            --set env=${{ steps.deploy.outputs.environment }} \
+            --set service.name=${{ env.SERVICE }} \
+            --set image.tag=${{ github.sha }} \
+            --set team=${{ needs.build.outputs.team }} \
+            --wait \
+            --timeout=20m
+
+      - name: Create Release
+        if: steps.deploy.outputs.continue == 'true' && steps.deploy.outputs.environment == 'prod'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.run_number }}
+          release_name: Release v${{ github.run_number }}
+          body: |
+            🚀 **Production Release**
+            **Service:** ${{ env.SERVICE }}
+            **Team:** ${{ needs.build.outputs.team }}
+            **Environment:** ${{ steps.deploy.outputs.environment }}
+            **Image:** ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            **URL:** https://${{ env.SERVICE }}-${{ steps.deploy.outputs.environment }}.${{ needs.build.outputs.domain }}
+            **Commit:** ${{ github.sha }}

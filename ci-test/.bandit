@@ -1,0 +1,3 @@
+[bandit]
+exclude_dirs = ci-test,helm,.git
+skips = B101

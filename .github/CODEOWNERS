@@ -1,0 +1,9 @@
+# Global owners
+* @team-1
+
+# Helm chart specific
+/helm/ @team-1 @platform-team
+
+# CI/CD specific  
+/.github/ @team-1 @platform-team
+/ci-test/ @team-1 @platform-team

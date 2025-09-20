@@ -1,0 +1,133 @@
+# Default values for galaxy.
+# This file contains shared values across all environments.
+
+# Environment name (should be overridden in env-specific values)
+env: ""
+
+# Team name (should be injected from CODEOWNERS)
+team: ""
+
+# Global configurations
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  domain: "yourdomain.com"
+
+# Service configuration - this drives all naming
+service:
+  name: galaxy
+  version: "1.0.0"
+  type: ClusterIP
+  port: 80
+  targetPort: 5000
+  annotations: {}
+
+# Image configuration
+image:
+  repository: galaxy/hello-world
+  pullPolicy: IfNotPresent
+  tag: ""
+
+# Replica configuration
+replicaCount: 2
+
+# Service account configuration
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod security context
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+
+# Resource configuration
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Autoscaling configuration
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# Node selection
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Probes configuration
+probes:
+  liveness:
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Standard Ingress configuration
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: "{{ .Values.app.name }}-{{ .Values.env }}.{{ .Values.global.domain }}"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+
+# Gateway API configuration
+gatewayApi:
+  enabled: false
+  gatewayName: "default-gateway"  # Reference to existing gateway
+  
+# Istio service mesh configuration
+istio:
+  enabled: false
+  virtualService:
+    enabled: false
+    gatewayName: "default-gateway"  # Reference to existing gateway
+  destinationRule:
+    enabled: false
+    trafficPolicy:
+      loadBalancer:
+        simple: LEAST_CONN
+
+# Environment-specific overrides placeholder
+environment: {}
+
+# Labels and annotations
+labels: {}
+annotations: {}
