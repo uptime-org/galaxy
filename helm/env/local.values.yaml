@@ -1,6 +1,10 @@
 # Local development environment values
 env: local
 
+# Override global domain for local development
+global:
+  domain: "localhost"
+
 # Single replica for local dev
 replicaCount: 1
 
@@ -21,10 +25,9 @@ resources:
 autoscaling:
   enabled: false
 
-# Ingress enabled for local (no port-forward needed)
+# Disable ingress for local (use NodePort instead)
 ingress:
-  enabled: true
-  className: "nginx"
+  enabled: false
 
 # Istio disabled for local
 istio:
@@ -34,6 +37,8 @@ istio:
 podDisruptionBudget:
   enabled: false
 
-# Service type NodePort for local access
+# Service configuration for local development (use same port as container)
 service:
   type: ClusterIP
+  port: 5000
+  targetPort: 5000

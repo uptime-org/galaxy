@@ -168,27 +168,20 @@ run_validation() {
         echo -e "   ${YELLOW}⚠️  Tests had issues (check ci-test/reports/)${NC}"
     fi
     
-    # Test build
-    echo "2. Building image..."
-    if $0 build >/dev/null 2>&1; then
-        echo -e "   ${GREEN}✅ Image built: galaxy:dev${NC}"
-        docker images galaxy:dev --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}\t{{.CreatedSince}}"
+    # Test build and deploy (use consistent tagging like run command)
+    echo "2. Building and deploying..."
+    if $0 run local >/dev/null 2>&1; then
+        echo -e "   ${GREEN}✅ Built and deployed successfully${NC}"
+        # Show the actual image that was built
+        LATEST_IMAGE=$(docker images galaxy --format "table {{.Repository}}:{{.Tag}}" | grep local | head -1)
+        echo -e "   ${BLUE}📦 Image: $LATEST_IMAGE${NC}"
     else
-        echo -e "   ${RED}❌ Build failed${NC}"
-        return 1
-    fi
-    
-    # Test deploy
-    echo "3. Deploying to k8s..."
-    if $0 deploy 2>&1 | grep -q "Deployed"; then
-        echo -e "   ${GREEN}✅ Deployed to namespace: local${NC}"
-    else
-        echo -e "   ${RED}❌ Deploy failed${NC}"
+        echo -e "   ${RED}❌ Build/Deploy failed${NC}"
         return 1
     fi
     
     # Test access
-    echo "4. Testing access..."
+    echo "3. Testing access..."
     sleep 5  # Wait for pod to be ready
     
     if $INGRESS_AVAILABLE; then
@@ -284,7 +277,28 @@ case "${1}" in
         esac
         
         echo -e "${YELLOW}🚀 Deploying to $ENV environment...${NC}"
-        TEAM=$(grep "^\\* @" .github/CODEOWNERS | head -1 | sed 's/^\\* @//' | awk '{print $1}' || echo "dev-team")
+        
+        # Fix team extraction from CODEOWNERS
+        TEAM=$(grep "^\* @" .github/CODEOWNERS | head -1 | sed 's/^\* @//' | awk '{print $1}' 2>/dev/null || echo "dev-team")
+        
+        # For local development, ensure required secret exists
+        if [[ "$ENV" == "local" ]]; then
+            echo -e "${BLUE}🔒 Ensuring local development secret exists...${NC}"
+            
+            # Create namespace if it doesn't exist
+            kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null 2>&1
+            
+            # Check if secret exists, create if not
+            if ! kubectl get secret "$SERVICE-$ENV-secrets" -n "$NAMESPACE" >/dev/null 2>&1; then
+                echo -e "${YELLOW}📝 Creating $SERVICE-$ENV-secrets secret...${NC}"
+                kubectl create secret generic "$SERVICE-$ENV-secrets" \
+                    --from-literal=password="local-dev-password-$(date +%s)" \
+                    -n "$NAMESPACE"
+                echo -e "${GREEN}✅ Secret created for local development${NC}"
+            else
+                echo -e "${BLUE}📝 Secret $SERVICE-$ENV-secrets already exists${NC}"
+            fi
+        fi
         
         helm upgrade --install "$SERVICE-$ENV" ./helm \
             --namespace "$NAMESPACE" \
@@ -309,12 +323,108 @@ case "${1}" in
     run)
         ENV="${2:-local}"
         CLEAN_FLAG="${3:-${2}}"
+        
+        # Generate image tag once to ensure consistency between build and deploy
+        IMAGE_TAG=$(get_image_tag "$ENV")
+        IMAGE_NAME=$(get_image_name "$ENV")
+        
+        # Build with specific tag
         if [[ "$CLEAN_FLAG" == "--clean" ]]; then
-            $0 build "$ENV" --clean
+            echo -e "${YELLOW}🏗️  Building $IMAGE_NAME (no cache)...${NC}"
+            docker build --no-cache -t "$IMAGE_NAME" .
         else
-            $0 build "$ENV"
+            echo -e "${YELLOW}🏗️  Building $IMAGE_NAME...${NC}"
+            docker build -t "$IMAGE_NAME" .
         fi
-        $0 deploy "$ENV"
+        echo -e "${GREEN}✅ Built $IMAGE_NAME${NC}"
+        
+        # Deploy with same tag
+        case "$ENV" in
+            local)
+                NAMESPACE="local"
+                VALUES_FILE="./helm/env/local.values.yaml"
+                PULL_POLICY="Never"
+                ;;
+            dev|stage|prod)
+                NAMESPACE="$ENV"
+                VALUES_FILE="./helm/env/$ENV.values.yaml"
+                PULL_POLICY="Always"
+                ;;
+            *)
+                echo -e "${RED}❌ Unknown environment: $ENV. Use: local|dev|stage|prod${NC}"
+                exit 1
+                ;;
+        esac
+        
+        echo -e "${YELLOW}🚀 Deploying to $ENV environment...${NC}"
+        
+        # Fix team extraction from CODEOWNERS
+        TEAM=$(grep "^\* @" .github/CODEOWNERS | head -1 | sed 's/^\* @//' | awk '{print $1}' 2>/dev/null || echo "dev-team")
+        
+        # For local development, ensure required secret exists and manage port-forwarding
+        if [[ "$ENV" == "local" ]]; then
+            echo -e "${BLUE}🔒 Ensuring local development secret exists...${NC}"
+            
+            # Create namespace if it doesn't exist
+            kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null 2>&1
+            
+            # Check if secret exists, create if not
+            if ! kubectl get secret "$SERVICE-$ENV-secrets" -n "$NAMESPACE" >/dev/null 2>&1; then
+                echo -e "${YELLOW}📝 Creating $SERVICE-$ENV-secrets secret...${NC}"
+                kubectl create secret generic "$SERVICE-$ENV-secrets" \
+                    --from-literal=password="local-dev-password-$(date +%s)" \
+                    -n "$NAMESPACE"
+                echo -e "${GREEN}✅ Secret created for local development${NC}"
+            else
+                echo -e "${BLUE}📝 Secret $SERVICE-$ENV-secrets already exists${NC}"
+            fi
+            
+            # Defensively kill any existing port-forwards for this service
+            echo -e "${BLUE}🛡️  Cleaning up existing port-forwards...${NC}"
+            pkill -f "kubectl.*port-forward.*galaxy-local" 2>/dev/null || true
+            # Also kill any port-forwards on port 5000
+            lsof -ti:5000 | xargs kill -9 2>/dev/null || true
+        fi
+        
+        helm upgrade --install "$SERVICE-$ENV" ./helm \
+            --namespace "$NAMESPACE" \
+            --create-namespace \
+            --values ./helm/values.yaml \
+            --values "$VALUES_FILE" \
+            --set env="$ENV" \
+            --set service.name="$SERVICE" \
+            --set image.repository="$(echo $SERVICE | cut -d':' -f1)" \
+            --set image.tag="$IMAGE_TAG" \
+            --set image.pullPolicy="$PULL_POLICY" \
+            --set team="$TEAM" \
+            --wait
+            
+        if [[ "$ENV" == "local" ]]; then
+            echo -e "${GREEN}✅ Deployed successfully!${NC}"
+            
+            # Wait for pod to be ready before starting port-forward
+            echo -e "${BLUE}⏳ Waiting for pod to be ready...${NC}"
+            kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=galaxy -n local --timeout=60s >/dev/null 2>&1
+            
+            # Start background port-forwarding
+            echo -e "${BLUE}🔗 Starting background port-forward on port 5000...${NC}"
+            nohup kubectl port-forward -n local svc/galaxy-local 5000:5000 >/dev/null 2>&1 &
+            PORT_FORWARD_PID=$!
+            
+            # Give it a moment to establish
+            sleep 2
+            
+            # Check if port-forward is working
+            if curl -s --max-time 3 http://localhost:5000/health >/dev/null 2>&1; then
+                echo -e "${GREEN}✅ Service ready! Access at: http://localhost:5000${NC}"
+                echo -e "${BLUE}📝 Health check: http://localhost:5000/health${NC}"
+                echo -e "${YELLOW}📝 Port-forward PID: $PORT_FORWARD_PID (will run in background)${NC}"
+            else
+                echo -e "${YELLOW}⚠️  Service deployed but not yet ready. Try: http://localhost:5000 in a moment${NC}"
+            fi
+        else
+            echo -e "${GREEN}✅ Deployed to $ENV environment!${NC}"
+        fi
         ;;
     
     images)

@@ -7,17 +7,13 @@ Production-ready Flask application with complete CI/CD pipeline, Helm deployment
 **Prerequisites:** Docker Desktop with Kubernetes enabled
 
 ```bash
-# Validate setup and deploy
-./validate
+# Validate setup and deploy locally
+./op validate
 
 # Daily development
-./dev run              # Build + deploy to local k8s
-./dev run --clean      # Clean build (no Docker cache)
+./op run local         # Build + deploy to local k8s
+./op run local --clean # Clean build (no Docker cache)
 
-# Access app
-kubectl port-forward -n local svc/galaxy-local 8080:80
-# Visit: http://localhost:8080
-```
 
 ## Architecture
 
@@ -37,15 +33,14 @@ kubectl port-forward -n local svc/galaxy-local 8080:80
 ## Project Structure
 
 ```
-├── app.py              # Flask application
+├── src/app.py          # Flask application
 ├── Dockerfile          # Production container
-├── dev                 # Local development script
-├── validate            # End-to-end validation
+├── op                  # Operations script (build, test, deploy)
 ├── helm/               # Kubernetes manifests
 │   ├── values.yaml     # Shared configuration
 │   ├── env/            # Environment-specific values
-│   └── templates/      # Abstract k8s resources
-├── ci-test/            # Docker-based testing
+│   └── templates/      # Kubernetes resource templates
+├── ci-test/            # Docker-based testing framework
 └── .github/workflows/  # CI/CD pipeline
 ```
 
@@ -53,13 +48,11 @@ kubectl port-forward -n local svc/galaxy-local 8080:80
 
 ```bash
 # Development
-./dev test              # Run CI tests
-./dev build [--clean]   # Build local image
-./dev deploy            # Deploy to local k8s
-./dev run [--clean]     # Build + deploy
-
-# Validation
-./validate              # Full system validation
+./op test               # Run CI tests
+./op build local        # Build local image
+./op deploy local       # Deploy to local k8s
+./op run local          # Build + deploy
+./op validate           # Full system validation
 
 # Access
 kubectl port-forward -n local svc/galaxy-local 8080:80
@@ -86,13 +79,6 @@ kubectl logs -n local -l app.kubernetes.io/name=galaxy -f
 4. Create GitHub release (prod only)
 
 ## Configuration
-
-**Required secrets:**
-- `GCP_SA_KEY` - GCP service account key
-- `GCP_PROJECT` - GCP project ID  
-- `GKE_CLUSTER` - GKE cluster name
-- `GKE_ZONE` - GKE cluster zone
-- `DEPLOY_ADMINS` - Deployment approval users
 
 **Environment URLs:** `https://{service}-{env}.{domain}`  
 **Team labels:** Auto-extracted from `.github/CODEOWNERS`  

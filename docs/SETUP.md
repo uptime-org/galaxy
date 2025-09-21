@@ -47,12 +47,12 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/cont
 
 ### 1. Run Tests
 ```bash
-./dev test
+./op test
 ```
 
 ### 2. Build and Deploy
 ```bash
-./dev run
+./op run local
 ```
 
 ### 3. Access the App
@@ -83,7 +83,7 @@ kubectl logs -n local -l app.kubernetes.io/name=galaxy
 
 ```bash
 # Full clean build and deploy
-./dev run --clean
+./op run local --clean
 
 # Check if app is responding
 curl -i http://galaxy-local.localhost
@@ -93,7 +93,6 @@ kubectl logs -n local -l app.kubernetes.io/name=galaxy -f
 
 # Clean up
 helm uninstall galaxy-local -n local
-kubectl delete namespace local
 ```
 
 ## Troubleshooting

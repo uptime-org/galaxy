@@ -3,6 +3,7 @@
 .swiggit.json
 .env
 .env copy
+WARP.md
 
 # CI test reports
 ci-test/reports/
